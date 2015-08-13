@@ -21,6 +21,8 @@
 @property (nonatomic) CGFloat lastZoomScale;
 @property (nonatomic, assign) BOOL fitsToScreen;
 
+@property (nonatomic, retain) UITapGestureRecognizer *gestureRecognizer;
+
 @end
 
 @implementation ImageScrollViewController
@@ -28,6 +30,11 @@
 - (void)commonInit
 {
     self.fitsToScreen = YES;
+    
+    self.gestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(doubleTapGesture:)];
+    self.gestureRecognizer.numberOfTapsRequired = 2;
+    
+    [self.view addGestureRecognizer:self.gestureRecognizer];
 }
 
 - (instancetype)init
@@ -126,6 +133,45 @@
     self.fitsToScreen = YES;
     self.imageView.image = [UIImage imageNamed: fileName];
     [self updateZoom];
+}
+
+- (void) positionContent:(CGPoint)cp toPosition:(CGPoint)vp {
+    CGPoint offset = CGPointZero;
+    float scale = self.scrollView.zoomScale;
+    
+    offset = CGPointMake(((cp.x * scale) - vp.x), ((cp.y * scale) - vp.y));
+    
+    [self.scrollView setContentOffset:offset];
+}
+
+- (BOOL)systemVersionGreaterThanOrEqualToVersion:(NSString *)minVersion
+{
+    NSString *sysVersion = [[UIDevice currentDevice] systemVersion];
+    return [sysVersion compare:minVersion options:NSNumericSearch] == NSOrderedDescending || [sysVersion compare:minVersion options:NSNumericSearch] == NSOrderedSame;
+}
+
+- (void) doubleTapGesture:(UIGestureRecognizer*)gestureRecognizer {
+    if (gestureRecognizer.state == UIGestureRecognizerStateEnded) {
+        if(self.scrollView.zoomScale < 1.0){
+            CGPoint locationInView = [gestureRecognizer locationOfTouch:0 inView:self.view.superview];
+            CGPoint locationInImage = [gestureRecognizer locationOfTouch:0 inView:self.imageView];
+
+            BOOL isAtLeastIOS8 = [self systemVersionGreaterThanOrEqualToVersion:@"8.0"];
+            void(^zoomIn)() = ^{
+                [self.scrollView setZoomScale:MAX(1,self.scrollView.minimumZoomScale) animated:isAtLeastIOS8 ? NO : YES];
+                [self positionContent:locationInImage toPosition:locationInView];
+            };
+            
+            if (isAtLeastIOS8)
+                [UIView animateWithDuration:0.4 animations:^{
+                    zoomIn();
+                }];
+            else
+                zoomIn();
+        } else {
+            [self.scrollView setZoomScale:self.scrollView.minimumZoomScale animated:YES];
+        }
+    }
 }
 
 @end
